@@ -38,7 +38,7 @@ def get_squeezenet(optimizer, weight_decay=None, image_size=224, num_classes=100
         logits = _mapping(X, num_classes, is_training)
 
         with tf.variable_scope('softmax'):
-            predictions = tf.nn.softmax(logits, name='predictions')
+            predictions = tf.nn.softmax(logits)
 
         with tf.variable_scope('log_loss'):
             log_loss = tf.losses.softmax_cross_entropy(Y, logits)
@@ -61,7 +61,7 @@ def get_squeezenet(optimizer, weight_decay=None, image_size=224, num_classes=100
 
         with tf.variable_scope('utilities'):
             init = tf.global_variables_initializer()
-            saver = tf.train.Saver(name='saver')
+            saver = tf.train.Saver()
             assign_weights = _assign_weights()
             is_equal = tf.equal(tf.argmax(predictions, 1), tf.argmax(Y, 1))
             accuracy = tf.reduce_mean(tf.cast(is_equal, tf.float32))

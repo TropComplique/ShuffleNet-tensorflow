@@ -228,9 +228,8 @@ def _mapping(X, num_classes, is_training):
     with tf.variable_scope('classifier', initializer=classifier_init):
 
         result = _global_average_pooling(result)
-        result = _dropout(result, 0.5, is_training)
-        with tf.variable_scope('fc'):
-            logits = _affine(result, num_classes)
+        result = _dropout(result, 0.1, is_training)
+        logits = _affine(result, num_classes)
 
     return logits
 
@@ -257,12 +256,12 @@ def _affine(X, size):
     maxval = math.sqrt(2.0/input_dim)
 
     W = tf.get_variable(
-        'W', [input_dim, size], tf.float32,
+        'kernel', [input_dim, size], tf.float32,
         tf.random_uniform_initializer(-maxval, maxval)
     )
 
     b = tf.get_variable(
-        'b', [size], tf.float32,
+        'bias', [size], tf.float32,
         tf.zeros_initializer()
     )
 

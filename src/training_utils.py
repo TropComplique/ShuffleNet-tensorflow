@@ -4,21 +4,6 @@ import os
 import time
 
 
-# it decides if training must stop
-def _is_early_stopping(losses, patience, index_to_watch):
-    test_losses = [x[index_to_watch] for x in losses]
-    if len(losses) > (patience + 4):
-        # running average
-        average = (test_losses[-(patience + 4)] +
-                   test_losses[-(patience + 3)] +
-                   test_losses[-(patience + 2)] +
-                   test_losses[-(patience + 1)] +
-                   test_losses[-patience])/5.0
-        return test_losses[-1] > average
-    else:
-        return False
-
-
 def train(run, graph, ops, train_tfrecords, val_tfrecords, batch_size,
           num_epochs, steps_per_epoch, validation_steps, patience=5,
           initial_weights=None, warm=False, initial_epoch=1, verbose=True):
@@ -217,3 +202,18 @@ def predict_proba(graph, ops, X, run=None, network_weights=None):
     sess.close()
 
     return predictions
+
+
+# it decides if training must stop
+def _is_early_stopping(losses, patience, index_to_watch):
+    test_losses = [x[index_to_watch] for x in losses]
+    if len(losses) > (patience + 4):
+        # running average
+        average = (test_losses[-(patience + 4)] +
+                   test_losses[-(patience + 3)] +
+                   test_losses[-(patience + 2)] +
+                   test_losses[-(patience + 1)] +
+                   test_losses[-patience])/5.0
+        return test_losses[-1] > average
+    else:
+        return False
