@@ -3,7 +3,7 @@ from input_utils import _get_data
 from parts_of_the_net import _mapping, _add_weight_decay
 
 
-def get_squeezenet(optimizer, weight_decay=None, image_size=224, num_classes=1000):
+def get_shufflenet(optimizer, groups=3, weight_decay=None, image_size=224, num_classes=1000):
     """Create a ShuffleNet computational graph.
 
     Arguments:
@@ -35,7 +35,7 @@ def get_squeezenet(optimizer, weight_decay=None, image_size=224, num_classes=100
             X -= mean
             X /= std
 
-        logits = _mapping(X, num_classes, is_training)
+        logits = _mapping(X, groups, num_classes, is_training)
 
         with tf.variable_scope('softmax'):
             predictions = tf.nn.softmax(logits)

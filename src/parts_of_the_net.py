@@ -113,39 +113,39 @@ def _depthwise_conv(X, kernel=3, stride=1, padding='SAME', trainable=True):
 
 
 def _channel_shuffle(X, groups):
-    batch_size, height, width, in_channels = X.shape.as_list()
+    height, width, in_channels = X.shape.as_list()[1:]
     in_channels_per_group = int(in_channels/groups)
 
-    shape = tf.stack([batch_size, height, width, groups, in_channels_per_group])
+    shape = tf.stack([-1, height, width, groups, in_channels_per_group])
     X = tf.reshape(X, shape)
 
     X = tf.transpose(X, [0, 1, 2, 4, 3])
 
-    shape = tf.stack([batch_size, height, width, in_channels])
+    shape = tf.stack([-1, height, width, in_channels])
     X = tf.reshape(X, shape)
     return X
 
 
-def _shufflenet_unit(X, groups, stride=1, trainable=False):
+def _shufflenet_unit(X, groups, is_training, stride=1, trainable=False):
 
     in_channels = X.shape.as_list()[-1]
     result = X
 
-    with tf.variable_scope('g_conv'):
-        result = _group_conv(result, in_channels, groups, trainable=trainablee)
-        result = _batch_norm(result)
+    with tf.variable_scope('g_conv0'):
+        result = _group_conv(result, in_channels, groups, trainable=trainable)
+        result = _batch_norm(result, is_training)
         result = _nonlinearity(result)
 
-    with tf.variable_scope('channel_shuffle'):
+    with tf.variable_scope('channel_shuffle1'):
         result = _channel_shuffle(result, groups)
 
-    with tf.variable_scope('dw_conv'):
+    with tf.variable_scope('dw_conv2'):
         result = _depthwise_conv(result, stride=stride, trainable=trainable)
-        result = _batch_norm(result)
+        result = _batch_norm(result, is_training)
 
-    with tf.variable_scope('g_conv'):
-        result = _group_conv(X, in_channels, groups, trainable=trainable)
-        result = _batch_norm(result)
+    with tf.variable_scope('g_conv3'):
+        result = _group_conv(result, in_channels, groups, trainable=trainable)
+        result = _batch_norm(result, is_training)
 
     if stride < 2:
         result = tf.add(result, X)
@@ -156,27 +156,27 @@ def _shufflenet_unit(X, groups, stride=1, trainable=False):
     return _nonlinearity(result)
 
 
-def _first_shufflenet_unit(X, out_channels, groups, trainable=False):
+def _first_shufflenet_unit(X, out_channels, groups, is_training, trainable=False):
 
     in_channels = X.shape.as_list()[-1]
     result = X
     out_channels -= in_channels
 
-    with tf.variable_scope('g_conv'):
-        result = _group_conv(result, out_channels, groups=1, trainable=trainablee)
-        result = _batch_norm(result)
+    with tf.variable_scope('g_conv0'):
+        result = _group_conv(result, out_channels, groups=1, trainable=trainable)
+        result = _batch_norm(result, is_training)
         result = _nonlinearity(result)
 
-    with tf.variable_scope('channel_shuffle'):
+    with tf.variable_scope('channel_shuffle1'):
         result = _channel_shuffle(result, groups)
 
-    with tf.variable_scope('dw_conv'):
+    with tf.variable_scope('dw_conv2'):
         result = _depthwise_conv(result, stride=2, trainable=trainable)
-        result = _batch_norm(result)
+        result = _batch_norm(result, is_training)
 
-    with tf.variable_scope('g_conv'):
-        result = _group_conv(X, out_channels, groups, trainable=trainable)
-        result = _batch_norm(result)
+    with tf.variable_scope('g_conv3'):
+        result = _group_conv(result, out_channels, groups, trainable=trainable)
+        result = _batch_norm(result, is_training)
 
     X = _avg_pooling(X)
     result = tf.concat([result, X], -1)
@@ -184,7 +184,7 @@ def _first_shufflenet_unit(X, out_channels, groups, trainable=False):
     return _nonlinearity(result)
 
 
-def _mapping(X, num_classes, is_training):
+def _mapping(X, groups, num_classes, is_training):
 
     # number of shuffle units of stride 1 in each stage
     n_shuffle_units = [3, 7, 3]
@@ -206,24 +206,30 @@ def _mapping(X, num_classes, is_training):
     with tf.variable_scope('features', initializer=features_init):
 
         with tf.variable_scope('conv1'):
-            result = _conv(X, 24, (3, 3), strides=(2, 2))
+            result = _conv(X, 24, kernel=3, stride=2)
         result = _max_pooling(result)
 
         with tf.variable_scope('stage2'):
-            result = _first_shufflenet_unit(result, out_channels, groups, stride=2)
-            for _ in range(n_shuffle_units[0]):
-                result = _shufflenet_unit(result, groups)
+            with tf.variable_scope('unit0'):
+                result = _first_shufflenet_unit(result, out_channels, groups, is_training)
+            for i in range(1, n_shuffle_units[0] + 1):
+                with tf.variable_scope('unit' + str(i)):
+                    result = _shufflenet_unit(result, groups, is_training)
 
         with tf.variable_scope('stage3'):
-            result = _shufflenet_unit(result, groups, stride=2)
-            for _ in range(n_shuffle_units[1]):
-                result = _shufflenet_unit(result, groups)
+            with tf.variable_scope('unit0'):
+                result = _shufflenet_unit(result, groups, is_training, stride=2)
+            for i in range(1, n_shuffle_units[1] + 1):
+                with tf.variable_scope('unit' + str(i)):
+                    result = _shufflenet_unit(result, groups, is_training)
 
         with tf.variable_scope('stage4'):
-            result = _shufflenet_unit(result, groups, stride=2)
-            for _ in range(n_shuffle_units[2]):
-                result = _shufflenet_unit(result, groups)
-
+            with tf.variable_scope('unit0'):
+                result = _shufflenet_unit(result, groups, is_training, stride=2)
+            for i in range(1, n_shuffle_units[2] + 1):
+                with tf.variable_scope('unit' + str(i)):
+                    result = _shufflenet_unit(result, groups, is_training)
+    
     classifier_init = tf.random_normal_initializer(mean=0.0, stddev=0.01)
     with tf.variable_scope('classifier', initializer=classifier_init):
 

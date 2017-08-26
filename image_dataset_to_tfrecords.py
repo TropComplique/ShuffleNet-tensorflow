@@ -6,7 +6,13 @@ from PIL import Image
 import os
 
 
-def collect_metadata(folder):
+def create_encoder(folder):
+    classes = os.listdir(folder)
+    encoder = {n: i for i, n in enumerate(classes)}
+    return encoder
+
+
+def collect_metadata(folder, encoder):
     """Collect paths to images. Collect their classes.
 
     Arguments:
@@ -28,9 +34,9 @@ def collect_metadata(folder):
             metadata.append(image_metadata)
 
     M = pd.DataFrame(metadata)
-    M.columns = ['class_number', 'img_path']
+    M.columns = ['class_name', 'img_path']
 
-    M['class_number'] = M.class_number.apply(int)
+    M['class_number'] = M.class_name.apply(lambda x: encoder[x])
 
     # shuffle the dataframe
     M = M.sample(frac=1).reset_index(drop=True)
@@ -70,10 +76,6 @@ def convert(images_metadata, folder, tfrecords_filename):
         # get class of the image
         target = row.class_number
 
-        # some preprocessing
-        target -= 1
-        # so that classes are in the range 0..(n_classes - 1)
-
         feature = {
             'image_raw': _bytes_feature(array.tostring()),
             'target': _int64_feature(target)
@@ -85,13 +87,16 @@ def convert(images_metadata, folder, tfrecords_filename):
     writer.close()
 
 
-data_dir = '/home/ubuntu/data/'
+data_dir = '/home/ubuntu/data/tiny-imagenet/'
 
-train_dir = data_dir + 'train'
-val_dir = data_dir + 'val'
+train_dir = data_dir + 'training'
+val_dir = data_dir + 'validation'
 
-train_metadata = collect_metadata(train_dir)
-val_metadata = collect_metadata(val_dir)
+encoder = create_encoder(train_dir)
+np.save('encoder.npy', encoder)
+
+train_metadata = collect_metadata(train_dir, encoder)
+val_metadata = collect_metadata(val_dir, encoder)
 
 # warning: tfrecords files can be big
 convert(train_metadata, train_dir, data_dir + 'train.tfrecords')
