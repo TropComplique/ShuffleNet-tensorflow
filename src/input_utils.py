@@ -39,7 +39,7 @@ def _get_batch(num_classes, tfrecords_file_name, image_size, batch_size):
     images, targets = _get_images_and_targets(tfrecords_file_name, image_size)
 
     # three values that you need to tweak
-    min_after_dequeue = 1000
+    min_after_dequeue = 30000
     num_threads = 4
     capacity = min_after_dequeue + (num_threads + 2)*64
     # 64 is a typical batch size
@@ -57,7 +57,7 @@ def _get_val_batch(num_classes, tfrecords_file_name, image_size, batch_size):
 
     images, targets = _get_images_and_targets(tfrecords_file_name, image_size)
     num_threads = 1
-    capacity = 256
+    capacity = 512
 
     x_batch, y_batch = tf.train.batch(
         [images, targets], batch_size,
@@ -75,7 +75,7 @@ def _get_images_and_targets(tfrecords_file_name, image_size):
     filename_queue = tf.train.string_input_producer([tfrecords_file_name])
     reader = tf.TFRecordReader()
     # this number you need to tweak
-    enqueue_many_size = 10
+    enqueue_many_size = 20
     _, serialized_example = reader.read_up_to(filename_queue, enqueue_many_size)
 
     features = {

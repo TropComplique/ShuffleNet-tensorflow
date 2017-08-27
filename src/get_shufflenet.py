@@ -59,7 +59,7 @@ def get_shufflenet(initial_learning_rate, groups=3, weight_decay=None,
                 dtype=tf.float32, name='lr'
             )
             drop_learning_rate = tf.assign(
-                learning_rate, learning_rate/0.1
+                learning_rate, 0.1*learning_rate
             )
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)

@@ -7,6 +7,15 @@ import os
 
 
 def create_encoder(folder):
+    """Encode directories in the folder with integer values.
+    Values are in the range 0..(n_directories - 1).
+
+    Arguments:
+        folder: A path to a folder where directories with images are.
+            Each directory - separate class.
+    Returns:
+        encoder: A dict.
+    """
     classes = os.listdir(folder)
     encoder = {n: i for i, n in enumerate(classes)}
     return encoder
@@ -18,8 +27,6 @@ def collect_metadata(folder, encoder):
     Arguments:
         folder: A path to a folder where directories with images are.
             Each directory - separate class.
-            Name of a directory - number of class.
-            Numbering is from 1 to n_classes.
     Returns:
         M: A pandas dataframe.
     """
@@ -73,11 +80,11 @@ def convert(images_metadata, folder, tfrecords_filename):
         image = Image.open(file_path)
         # convert to an array
         array = np.asarray(image, dtype='uint8')
-        
+
         # some images are grayscale
         if array.shape[-1] != 3:
             array = np.stack([array, array, array], axis=2)
-        
+
         # get class of the image
         target = row.class_number
 
@@ -98,6 +105,7 @@ train_dir = data_dir + 'training'
 val_dir = data_dir + 'validation'
 
 encoder = create_encoder(train_dir)
+# now you can get folder's name from class index
 np.save('encoder.npy', encoder)
 
 train_metadata = collect_metadata(train_dir, encoder)

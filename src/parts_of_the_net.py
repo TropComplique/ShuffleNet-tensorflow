@@ -167,14 +167,11 @@ def _first_shufflenet_unit(X, out_channels, groups, is_training, trainable=True)
         result = _batch_norm(result, is_training)
         result = _nonlinearity(result)
 
-    with tf.variable_scope('channel_shuffle_1'):
-        result = _channel_shuffle(result, groups)
-
-    with tf.variable_scope('dw_conv_2'):
+    with tf.variable_scope('dw_conv_1'):
         result = _depthwise_conv(result, stride=2, trainable=trainable)
         result = _batch_norm(result, is_training)
 
-    with tf.variable_scope('g_conv_3'):
+    with tf.variable_scope('g_conv_2'):
         result = _group_conv(result, out_channels, groups, trainable=trainable)
         result = _batch_norm(result, is_training)
 
@@ -188,6 +185,7 @@ def _mapping(X, groups, num_classes, is_training):
 
     # number of shuffle units of stride 1 in each stage
     n_shuffle_units = [1, 1, 1]
+    # in the original paper: [3, 7, 3]
 
     # second stage's number of output channels
     if groups == 1:
@@ -206,7 +204,9 @@ def _mapping(X, groups, num_classes, is_training):
     with tf.variable_scope('features', initializer=features_init):
 
         with tf.variable_scope('conv1'):
-            result = _conv(X, 24, kernel=3, stride=1) # changed 2->1
+            result = _conv(X, 24, kernel=3, stride=1)
+            # in the original paper they are using stride=2
+            # but because I use small 64x64 images I chose stride=1
         result = _max_pooling(result)
 
         with tf.variable_scope('stage2'):

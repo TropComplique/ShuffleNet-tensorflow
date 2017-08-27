@@ -6,7 +6,7 @@ import time
 
 def train(run, graph, ops, train_tfrecords, val_tfrecords, batch_size,
           num_epochs, steps_per_epoch, validation_steps,
-          lr_patience, lr_threshold=0.01, patience=5, threshold=0.01,
+          lr_patience=5, lr_threshold=0.01, patience=10, threshold=0.01,
           warm=False, initial_epoch=1, verbose=True):
     """Fit a defined network.
 
@@ -22,11 +22,11 @@ def train(run, graph, ops, train_tfrecords, val_tfrecords, batch_size,
         steps_per_epoch: An integer, number of optimization steps per epoch.
         validation_steps: An integer, number of batches from validation dataset
             to evaluate on.
-        lr_patience:
-        lr_threshold:
+        lr_patience: An integer.
+        lr_threshold: A scalar.
         patience: An integer, number of epochs before early stopping if
             test accuracy isn't improving.
-        threshold:
+        threshold: A scalar.
         warm: Boolean, if `True` then resume training from the previously
             saved model.
         initial_epoch: epoch at which to start training
@@ -106,7 +106,7 @@ def train(run, graph, ops, train_tfrecords, val_tfrecords, batch_size,
 
         # main training loop
         for step in range(1, steps_per_epoch):
-            
+
             _, batch_loss, batch_accuracy = sess.run(
                 [optimize_op, log_loss_op, accuracy_op]
             )
@@ -131,10 +131,11 @@ def train(run, graph, ops, train_tfrecords, val_tfrecords, batch_size,
         losses += [(epoch, train_loss, test_loss, train_accuracy, test_accuracy)]
 
         # consider a possibility of early stopping
-        if _is_early_stopping(losses, patience, 2):
+        if _is_early_stopping(losses, patience, threshold):
             is_early_stopped = True
             break
 
+        # consider a possibility of reducing learning rate by 10
         _reduce_lr_on_plateau(
             sess, drop_learning_rate_op,
             losses, lr_patience, lr_threshold
