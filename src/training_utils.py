@@ -5,8 +5,9 @@ import time
 
 
 def train(run, graph, ops, train_tfrecords, val_tfrecords, batch_size,
-          num_epochs, steps_per_epoch, validation_steps, patience=5,
-          initial_weights=None, warm=False, initial_epoch=1, verbose=True):
+          num_epochs, steps_per_epoch, validation_steps,
+          lr_patience, lr_threshold=0.01, patience=5, threshold=0.01,
+          warm=False, initial_epoch=1, verbose=True):
     """Fit a defined network.
 
     Arguments:
@@ -21,9 +22,11 @@ def train(run, graph, ops, train_tfrecords, val_tfrecords, batch_size,
         steps_per_epoch: An integer, number of optimization steps per epoch.
         validation_steps: An integer, number of batches from validation dataset
             to evaluate on.
+        lr_patience:
+        lr_threshold:
         patience: An integer, number of epochs before early stopping if
-            test logloss isn't improving.
-        initial_weights: A dictionary of weights to initialize network with or None.
+            test accuracy isn't improving.
+        threshold:
         warm: Boolean, if `True` then resume training from the previously
             saved model.
         initial_epoch: epoch at which to start training
@@ -51,19 +54,13 @@ def train(run, graph, ops, train_tfrecords, val_tfrecords, batch_size,
 
     # get graph's ops
     data_init_op, predictions_op, log_loss_op, optimize_op,\
-        grad_summaries_op, init_op, saver_op, assign_weights_op,\
+        grad_summaries_op, init_op, saver_op, drop_learning_rate_op,\
         accuracy_op, summaries_op = ops
 
     if warm:
         saver_op.restore(sess, dir_to_save + '/model')
     else:
         sess.run(init_op)
-        if initial_weights is not None:
-            # keys in 'initial_weights' dict are full paths to the weights
-            # for example: 'features/fire9/expand3x3/kernel:0'
-            for w in initial_weights:
-                op = assign_weights_op[w]
-                sess.run(op, {'utilities/' + w: initial_weights[w]})
 
     # things that will be returned
     losses = []
@@ -138,6 +135,11 @@ def train(run, graph, ops, train_tfrecords, val_tfrecords, batch_size,
             is_early_stopped = True
             break
 
+        _reduce_lr_on_plateau(
+            sess, drop_learning_rate_op,
+            losses, lr_patience, lr_threshold
+        )
+
     coord.request_stop()
     coord.join(threads)
 
@@ -163,7 +165,7 @@ def _evaluate(sess, validation_steps, log_loss_op, accuracy_op):
     return test_loss, test_accuracy
 
 
-def predict_proba(graph, ops, X, run=None, network_weights=None):
+def predict_proba(graph, ops, X, run):
     """Predict probabilities with a fitted model.
 
     Arguments:
@@ -173,8 +175,6 @@ def predict_proba(graph, ops, X, run=None, network_weights=None):
             and of type 'float32'.
         run: An integer that determines a folder where a fitted model
             is saved or None.
-        network_weights: A dictionary of weights to initialize
-            network with or None. You must specify either run or network_weights.
 
     Returns:
         predictions: A numpy array of shape [n_samples, n_classes]
@@ -184,19 +184,11 @@ def predict_proba(graph, ops, X, run=None, network_weights=None):
 
     # get graph's ops
     data_init_op, predictions_op, log_loss_op, optimize_op,\
-        grad_summaries_op, init_op, saver_op, assign_weights_op,\
+        grad_summaries_op, init_op, saver_op, drop_learning_rate_op,\
         accuracy_op, summaries_op = ops
-    # only predictions_op, saver_op, and assign_weights_op are used here
+    # only predictions_op and saver_op are used here
 
-    if run is not None:
-        saver_op.restore(sess, 'saved/run' + str(run) + '/model')
-    elif network_weights is not None:
-        for w in network_weights:
-            op = assign_weights_op[w]
-            sess.run(op, {'utilities/' + w: network_weights[w]})
-    else:
-        print('Specify run or network_weights!')
-
+    saver_op.restore(sess, 'saved/run' + str(run) + '/model')
     feed_dict = {'inputs/X:0': X, 'control/is_training:0': False}
     predictions = sess.run(predictions_op, feed_dict)
     sess.close()
@@ -205,15 +197,30 @@ def predict_proba(graph, ops, X, run=None, network_weights=None):
 
 
 # it decides if training must stop
-def _is_early_stopping(losses, patience, index_to_watch):
-    test_losses = [x[index_to_watch] for x in losses]
+def _is_early_stopping(losses, patience, threshold):
+    accuracies = [x[4] for x in losses]
     if len(losses) > (patience + 4):
         # running average
-        average = (test_losses[-(patience + 4)] +
-                   test_losses[-(patience + 3)] +
-                   test_losses[-(patience + 2)] +
-                   test_losses[-(patience + 1)] +
-                   test_losses[-patience])/5.0
-        return test_losses[-1] > average
+        average = (accuracies[-(patience + 4)] +
+                   accuracies[-(patience + 3)] +
+                   accuracies[-(patience + 2)] +
+                   accuracies[-(patience + 1)] +
+                   accuracies[-patience])/5.0
+        return accuracies[-1] < average + threshold
     else:
         return False
+
+
+def _reduce_lr_on_plateau(sess, drop_learning_rate_op,
+                          losses, patience, threshold):
+    accuracies = [x[4] for x in losses]
+    if len(losses) > (patience + 4):
+        # running average
+        average = (accuracies[-(patience + 4)] +
+                   accuracies[-(patience + 3)] +
+                   accuracies[-(patience + 2)] +
+                   accuracies[-(patience + 1)] +
+                   accuracies[-patience])/5.0
+        if accuracies[-1] < (average + threshold):
+            sess.run(drop_learning_rate_op)
+            print('learning rate is divided by 10')

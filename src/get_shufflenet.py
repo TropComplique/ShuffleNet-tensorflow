@@ -3,11 +3,14 @@ from input_utils import _get_data
 from parts_of_the_net import _mapping, _add_weight_decay
 
 
-def get_shufflenet(optimizer, groups=3, weight_decay=None, image_size=224, num_classes=1000):
+def get_shufflenet(initial_learning_rate, groups=3, weight_decay=None,
+                   image_size=224, num_classes=1000):
     """Create a ShuffleNet computational graph.
 
     Arguments:
-        optimizer: A Tensorflow optimizer.
+        initial_learning_rate: A scalar.
+        groups: An integer, number of groups in group convolutions.
+            Only possible values are: 1, 2, 3, 4, 8.
         weight_decay: A scalar or None.
         image_size: An integer, input image size.
         num_classes: An integer.
@@ -50,7 +53,20 @@ def get_shufflenet(optimizer, groups=3, weight_decay=None, image_size=224, num_c
         with tf.variable_scope('total_loss'):
             total_loss = tf.losses.get_total_loss()
 
-        with tf.variable_scope('optimizer'):
+        with tf.variable_scope('learning_rate'):
+            learning_rate = tf.Variable(
+                initial_learning_rate, trainable=False,
+                dtype=tf.float32, name='lr'
+            )
+            drop_learning_rate = tf.assign(
+                learning_rate, learning_rate/0.1
+            )
+
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops), tf.variable_scope('optimizer'):
+            optimizer = tf.train.MomentumOptimizer(
+                learning_rate, momentum=0.9, use_nesterov=True
+            )
             grads_and_vars = optimizer.compute_gradients(total_loss)
             optimize = optimizer.apply_gradients(grads_and_vars)
 
@@ -62,7 +78,6 @@ def get_shufflenet(optimizer, groups=3, weight_decay=None, image_size=224, num_c
         with tf.variable_scope('utilities'):
             init = tf.global_variables_initializer()
             saver = tf.train.Saver()
-            assign_weights = _assign_weights()
             is_equal = tf.equal(tf.argmax(predictions, 1), tf.argmax(Y, 1))
             accuracy = tf.reduce_mean(tf.cast(is_equal, tf.float32))
 
@@ -71,7 +86,7 @@ def get_shufflenet(optimizer, groups=3, weight_decay=None, image_size=224, num_c
     graph.finalize()
     ops = [
         data_init, predictions, log_loss, optimize,
-        grad_summaries, init, saver, assign_weights,
+        grad_summaries, init, saver, drop_learning_rate,
         accuracy, summaries
     ]
     return graph, ops
@@ -87,17 +102,3 @@ def _add_summaries():
         summaries += [tf.summary.histogram(v.name[:-2] + '_hist', v)]
 
     return tf.summary.merge(summaries)
-
-
-def _assign_weights():
-    # add ops that can be used to load pretrained weights into the model
-
-    assign_weights_dict = {}
-    model_vars = tf.get_collection(tf.GraphKeys.MODEL_VARIABLES)
-
-    for v in model_vars:
-        assign_weights_dict[v.name] = v.assign(
-            tf.placeholder(tf.float32, v.shape, v.name[:-2])
-        )
-
-    return assign_weights_dict
