@@ -106,7 +106,7 @@ def train(run, graph, ops, train_tfrecords, val_tfrecords, batch_size,
 
         # main training loop
         for step in range(1, steps_per_epoch):
-
+            
             _, batch_loss, batch_accuracy = sess.run(
                 [optimize_op, log_loss_op, accuracy_op]
             )

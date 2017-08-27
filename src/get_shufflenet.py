@@ -4,7 +4,7 @@ from parts_of_the_net import _mapping, _add_weight_decay
 
 
 def get_shufflenet(initial_learning_rate, groups=3, weight_decay=None,
-                   image_size=224, num_classes=1000):
+                   image_size=64, num_classes=200):
     """Create a ShuffleNet computational graph.
 
     Arguments:

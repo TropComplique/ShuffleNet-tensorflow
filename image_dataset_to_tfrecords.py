@@ -73,6 +73,11 @@ def convert(images_metadata, folder, tfrecords_filename):
         image = Image.open(file_path)
         # convert to an array
         array = np.asarray(image, dtype='uint8')
+        
+        # some images are grayscale
+        if array.shape[-1] != 3:
+            array = np.stack([array, array, array], axis=2)
+        
         # get class of the image
         target = row.class_number
 
@@ -87,7 +92,7 @@ def convert(images_metadata, folder, tfrecords_filename):
     writer.close()
 
 
-data_dir = '/home/ubuntu/data/tiny-imagenet/'
+data_dir = '/home/ubuntu/data/tiny-imagenet-200/'
 
 train_dir = data_dir + 'training'
 val_dir = data_dir + 'validation'

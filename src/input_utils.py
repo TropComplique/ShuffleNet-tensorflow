@@ -56,7 +56,6 @@ def _get_batch(num_classes, tfrecords_file_name, image_size, batch_size):
 def _get_val_batch(num_classes, tfrecords_file_name, image_size, batch_size):
 
     images, targets = _get_images_and_targets(tfrecords_file_name, image_size)
-
     num_threads = 1
     capacity = 256
 
