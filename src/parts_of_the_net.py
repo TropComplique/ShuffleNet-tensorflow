@@ -2,6 +2,88 @@ import tensorflow as tf
 import math
 
 
+def _channel_shuffle(X, groups):
+    height, width, in_channels = X.shape.as_list()[1:]
+    in_channels_per_group = int(in_channels/groups)
+    # reshape
+    shape = tf.stack([-1, height, width, groups, in_channels_per_group])
+    X = tf.reshape(X, shape)
+    # transpose
+    X = tf.transpose(X, [0, 1, 2, 4, 3])
+    # reshape
+    shape = tf.stack([-1, height, width, in_channels])
+    X = tf.reshape(X, shape)
+    return X
+
+
+# a ShuffleNet implementation
+def _mapping(X, groups, num_classes, is_training):
+
+    # number of shuffle units of stride 1 in each stage
+    n_shuffle_units = [1, 1, 1]
+    # in the original paper: [3, 7, 3]
+
+    # second stage's number of output channels
+    if groups == 1:
+        out_channels = 144
+    elif groups == 2:
+        out_channels = 200
+    elif groups == 3:
+        out_channels = 240
+    elif groups == 4:
+        out_channels = 272
+    elif groups == 8:
+        out_channels = 384
+    # all 'out_channels' are divisible by corresponding 'groups'
+
+    # to customize the network to a desired complexity
+    # we can apply a scale factor
+    out_channels = int(out_channels*0.5)
+    # in the original paper they are considering
+    # scale factor values: 0.25, 0.5, 1.0
+
+    with tf.variable_scope('features'):
+
+        with tf.variable_scope('stage1'):
+            with tf.variable_scope('conv1'):
+                result = _conv(X, 24, kernel=3, stride=1)
+                # in the original paper they are using stride=2
+                # but because I use small 64x64 images I chose stride=1
+            result = _batch_norm(result, is_training)
+            result = _nonlinearity(result)
+            # in the original paper they are not using batch_norm and relu here
+            result = _max_pooling(result)
+
+        with tf.variable_scope('stage2'):
+            with tf.variable_scope('unit0'):
+                result = _first_shufflenet_unit(result, out_channels, groups, is_training)
+            for i in range(1, n_shuffle_units[0] + 1):
+                with tf.variable_scope('unit' + str(i)):
+                    result = _shufflenet_unit(result, groups, is_training)
+
+        with tf.variable_scope('stage3'):
+            with tf.variable_scope('unit0'):
+                result = _shufflenet_unit(result, groups, is_training, stride=2)
+            for i in range(1, n_shuffle_units[1] + 1):
+                with tf.variable_scope('unit' + str(i)):
+                    result = _shufflenet_unit(result, groups, is_training)
+
+        with tf.variable_scope('stage4'):
+            with tf.variable_scope('unit0'):
+                result = _shufflenet_unit(result, groups, is_training, stride=2)
+            for i in range(1, n_shuffle_units[2] + 1):
+                with tf.variable_scope('unit' + str(i)):
+                    result = _shufflenet_unit(result, groups, is_training)
+
+    with tf.variable_scope('classifier'):
+        result = _global_average_pooling(result)
+        result = _dropout(result, 0.5, is_training)
+        # in the original paper they are not using dropout here
+        logits = _affine(result, num_classes)
+
+    return logits
+
+
 def _nonlinearity(X):
     return tf.nn.relu(X, name='ReLU')
 
@@ -21,11 +103,10 @@ def _dropout(X, rate, is_training):
 
 
 def _batch_norm(X, is_training):
-    return tf.contrib.layers.batch_norm(
-        X, is_training=is_training, scale=False, center=True,
-        fused=True, scope='batch_norm',
-        variables_collections=tf.GraphKeys.MODEL_VARIABLES,
-        trainable=True
+    return tf.layers.batch_normalization(
+        X, scale=False, center=True,
+        momentum=0.1,  # sometimes right momentum value is very important
+        training=is_training, fused=True
     )
 
 
@@ -50,7 +131,7 @@ def _avg_pooling(X):
     )
 
 
-def _conv(X, filters, kernel=3, stride=1, padding='SAME', trainable=True):
+def _conv(X, filters, kernel=3, stride=1, padding='SAME'):
 
     in_channels = X.shape.as_list()[-1]
     # kaiming uniform initialization
@@ -58,24 +139,20 @@ def _conv(X, filters, kernel=3, stride=1, padding='SAME', trainable=True):
 
     K = tf.get_variable(
         'kernel', [kernel, kernel, in_channels, filters],
-        tf.float32, tf.random_uniform_initializer(-maxval, maxval),
-        trainable=trainable
+        tf.float32, tf.random_uniform_initializer(-maxval, maxval)
     )
 
     b = tf.get_variable(
         'bias', [filters], tf.float32,
-        tf.zeros_initializer(), trainable=trainable
+        tf.zeros_initializer()
     )
-
-    tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, K)
-    tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, b)
 
     return tf.nn.bias_add(
         tf.nn.conv2d(X, K, [1, stride, stride, 1], padding), b
     )
 
 
-def _group_conv(X, filters, groups, kernel=1, stride=1, padding='SAME', trainable=True):
+def _group_conv(X, filters, groups, kernel=1, stride=1, padding='SAME'):
 
     in_channels = X.shape.as_list()[-1]
     in_channels_per_group = int(in_channels/groups)
@@ -89,22 +166,22 @@ def _group_conv(X, filters, groups, kernel=1, stride=1, padding='SAME', trainabl
         trainable=trainable
     )
 
+    # split channels
     X_channel_splits = tf.split(X, [in_channels_per_group]*groups, axis=-1)
     K_filter_splits = tf.split(K, [filters_per_group]*groups, axis=-1)
 
     results = []
 
+    # do convolution for each split
     for i in range(groups):
         X_split = X_channel_splits[i]
         K_split = K_filter_splits[i]
         results += [tf.nn.conv2d(X_split, K_split, [1, stride, stride, 1], padding)]
 
-    tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, K)
-
     return tf.concat(results, -1)
 
 
-def _depthwise_conv(X, kernel=3, stride=1, padding='SAME', trainable=True):
+def _depthwise_conv(X, kernel=3, stride=1, padding='SAME'):
 
     in_channels = X.shape.as_list()[-1]
     # kaiming uniform initialization
@@ -112,36 +189,19 @@ def _depthwise_conv(X, kernel=3, stride=1, padding='SAME', trainable=True):
 
     W = tf.get_variable(
         'depthwise_kernel', [kernel, kernel, in_channels, 1],
-        tf.float32, tf.random_uniform_initializer(-maxval, maxval),
-        trainable=trainable
+        tf.float32, tf.random_uniform_initializer(-maxval, maxval)
     )
-
-    tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, W)
 
     return tf.nn.depthwise_conv2d(X, W, [1, stride, stride, 1], padding)
 
 
-def _channel_shuffle(X, groups):
-    height, width, in_channels = X.shape.as_list()[1:]
-    in_channels_per_group = int(in_channels/groups)
-
-    shape = tf.stack([-1, height, width, groups, in_channels_per_group])
-    X = tf.reshape(X, shape)
-
-    X = tf.transpose(X, [0, 1, 2, 4, 3])
-
-    shape = tf.stack([-1, height, width, in_channels])
-    X = tf.reshape(X, shape)
-    return X
-
-
-def _shufflenet_unit(X, groups, is_training, stride=1, trainable=True):
+def _shufflenet_unit(X, groups, is_training, stride=1):
 
     in_channels = X.shape.as_list()[-1]
     result = X
 
     with tf.variable_scope('g_conv_0'):
-        result = _group_conv(result, in_channels, groups, trainable=trainable)
+        result = _group_conv(result, in_channels, groups)
         result = _batch_norm(result, is_training)
         result = _nonlinearity(result)
 
@@ -149,11 +209,11 @@ def _shufflenet_unit(X, groups, is_training, stride=1, trainable=True):
         result = _channel_shuffle(result, groups)
 
     with tf.variable_scope('dw_conv_2'):
-        result = _depthwise_conv(result, stride=stride, trainable=trainable)
+        result = _depthwise_conv(result, stride=stride)
         result = _batch_norm(result, is_training)
 
     with tf.variable_scope('g_conv_3'):
-        result = _group_conv(result, in_channels, groups, trainable=trainable)
+        result = _group_conv(result, in_channels, groups)
         result = _batch_norm(result, is_training)
 
     if stride < 2:
@@ -165,97 +225,30 @@ def _shufflenet_unit(X, groups, is_training, stride=1, trainable=True):
     return _nonlinearity(result)
 
 
-def _first_shufflenet_unit(X, out_channels, groups, is_training, trainable=True):
+# first shufflenet unit is different from the rest
+def _first_shufflenet_unit(X, out_channels, groups, is_training):
 
     in_channels = X.shape.as_list()[-1]
     result = X
     out_channels -= in_channels
 
     with tf.variable_scope('g_conv_0'):
-        result = _group_conv(result, out_channels, groups=1, trainable=trainable)
+        result = _group_conv(result, out_channels, groups=1)
         result = _batch_norm(result, is_training)
         result = _nonlinearity(result)
 
     with tf.variable_scope('dw_conv_1'):
-        result = _depthwise_conv(result, stride=2, trainable=trainable)
+        result = _depthwise_conv(result, stride=2)
         result = _batch_norm(result, is_training)
 
     with tf.variable_scope('g_conv_2'):
-        result = _group_conv(result, out_channels, groups, trainable=trainable)
+        result = _group_conv(result, out_channels, groups)
         result = _batch_norm(result, is_training)
 
     X = _avg_pooling(X)
     result = tf.concat([result, X], -1)
 
     return _nonlinearity(result)
-
-
-def _mapping(X, groups, num_classes, is_training):
-
-    # number of shuffle units of stride 1 in each stage
-    n_shuffle_units = [1, 1, 1]
-    # in the original paper: [3, 7, 3]
-
-    # second stage's number of output channels
-    if groups == 1:
-        out_channels = 144
-    elif groups == 2:
-        out_channels = 200
-    elif groups == 3:
-        out_channels = 240
-    elif groups == 4:
-        out_channels = 272
-    elif groups == 8:
-        out_channels = 384
-    # all 'out_channels' are divisible by corresponding 'groups'
-    
-    # to customize the network to a desired complexity
-    # we can simply apply a scale factor
-    out_channels = int(out_channels*0.5)
-
-    with tf.variable_scope('features'):
-
-        with tf.variable_scope('conv1'):
-            result = _conv(X, 24, kernel=3, stride=1)
-            # in the original paper they are using stride=2
-            # but because I use small 64x64 images I chose stride=1
-            result = _batch_norm(result, is_training)
-            result = _nonlinearity(result)
-        result = _max_pooling(result)
-
-        with tf.variable_scope('stage2'):
-
-            with tf.variable_scope('unit0'):
-                result = _first_shufflenet_unit(result, out_channels, groups, is_training)
-
-            for i in range(1, n_shuffle_units[0] + 1):
-                with tf.variable_scope('unit' + str(i)):
-                    result = _shufflenet_unit(result, groups, is_training)
-
-        with tf.variable_scope('stage3'):
-
-            with tf.variable_scope('unit0'):
-                result = _shufflenet_unit(result, groups, is_training, stride=2)
-
-            for i in range(1, n_shuffle_units[1] + 1):
-                with tf.variable_scope('unit' + str(i)):
-                    result = _shufflenet_unit(result, groups, is_training)
-
-        with tf.variable_scope('stage4'):
-
-            with tf.variable_scope('unit0'):
-                result = _shufflenet_unit(result, groups, is_training, stride=2)
-
-            for i in range(1, n_shuffle_units[2] + 1):
-                with tf.variable_scope('unit' + str(i)):
-                    result = _shufflenet_unit(result, groups, is_training)
-
-    with tf.variable_scope('classifier'):
-        result = _global_average_pooling(result)
-        result = _dropout(result, 0.5, is_training)
-        logits = _affine(result, num_classes)
-
-    return logits
 
 
 def _add_weight_decay(weight_decay):
@@ -289,8 +282,5 @@ def _affine(X, size):
         'bias', [size], tf.float32,
         tf.zeros_initializer()
     )
-
-    tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, W)
-    tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, b)
 
     return tf.nn.bias_add(tf.matmul(X, W), b)

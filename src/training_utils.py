@@ -22,7 +22,8 @@ def train(run, graph, ops, train_tfrecords, val_tfrecords, batch_size,
         steps_per_epoch: An integer, number of optimization steps per epoch.
         validation_steps: An integer, number of batches from validation dataset
             to evaluate on.
-        lr_patience: An integer.
+        lr_patience: An integer, patience for reduce_on_plateau learning rate
+            scheduler.
         lr_threshold: A scalar.
         patience: An integer, number of epochs before early stopping if
             test accuracy isn't improving.
