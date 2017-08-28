@@ -64,9 +64,7 @@ def get_shufflenet(initial_learning_rate, groups=3, weight_decay=None,
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops), tf.variable_scope('optimizer'):
-            optimizer = tf.train.MomentumOptimizer(
-                learning_rate, momentum=0.9, use_nesterov=True
-            )
+            optimizer = tf.train.AdamOptimizer(learning_rate)
             grads_and_vars = optimizer.compute_gradients(total_loss)
             optimize = optimizer.apply_gradients(grads_and_vars)
 

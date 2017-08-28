@@ -57,7 +57,7 @@ def train(run, graph, ops, train_tfrecords, val_tfrecords, batch_size,
     data_init_op, predictions_op, log_loss_op, optimize_op,\
         grad_summaries_op, init_op, saver_op, drop_learning_rate_op,\
         accuracy_op, summaries_op = ops
-
+    
     if warm:
         saver_op.restore(sess, dir_to_save + '/model')
     else:

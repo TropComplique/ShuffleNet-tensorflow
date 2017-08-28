@@ -20,7 +20,7 @@ def _channel_shuffle(X, groups):
 def _mapping(X, groups, num_classes, is_training):
 
     # number of shuffle units of stride 1 in each stage
-    n_shuffle_units = [1, 1, 1]
+    n_shuffle_units = [2, 3, 2]
     # in the original paper: [3, 7, 3]
 
     # second stage's number of output channels
@@ -38,7 +38,7 @@ def _mapping(X, groups, num_classes, is_training):
 
     # to customize the network to a desired complexity
     # we can apply a scale factor
-    out_channels = int(out_channels*0.5)
+    out_channels = int(out_channels*0.25)
     # in the original paper they are considering
     # scale factor values: 0.25, 0.5, 1.0
 
@@ -162,8 +162,7 @@ def _group_conv(X, filters, groups, kernel=1, stride=1, padding='SAME'):
 
     K = tf.get_variable(
         'kernel', [kernel, kernel, in_channels_per_group, filters],
-        tf.float32, tf.random_uniform_initializer(-maxval, maxval),
-        trainable=trainable
+        tf.float32, tf.random_uniform_initializer(-maxval, maxval)
     )
 
     # split channels

@@ -1,5 +1,10 @@
 import tensorflow as tf
 
+"""
+This is another version of input pipeline. 
+It uses tf.contrib.data.
+But it is slower than version with queues (difference is ~15s).
+"""
 
 def _parse_and_preprocess(example_proto, image_size):
 
@@ -20,7 +25,7 @@ def _parse_and_preprocess(example_proto, image_size):
     return image, target
 
 
-def _get_data(num_classes, image_size, is_training):
+def _get_data(num_classes, image_size):
 
     batch_size = tf.Variable(
         tf.placeholder(tf.int64, [], 'batch_size'),
