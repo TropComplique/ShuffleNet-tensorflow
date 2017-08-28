@@ -22,7 +22,7 @@ def _dropout(X, rate, is_training):
 
 def _batch_norm(X, is_training):
     return tf.contrib.layers.batch_norm(
-        X, is_training=is_training, scale=True, center=True,
+        X, is_training=is_training, scale=False, center=True,
         fused=True, scope='batch_norm',
         variables_collections=tf.GraphKeys.MODEL_VARIABLES,
         trainable=True
@@ -53,10 +53,13 @@ def _avg_pooling(X):
 def _conv(X, filters, kernel=3, stride=1, padding='SAME', trainable=True):
 
     in_channels = X.shape.as_list()[-1]
+    # kaiming uniform initialization
+    maxval = math.sqrt(6.0/in_channels)
 
     K = tf.get_variable(
         'kernel', [kernel, kernel, in_channels, filters],
-        tf.float32, trainable=trainable
+        tf.float32, tf.random_uniform_initializer(-maxval, maxval),
+        trainable=trainable
     )
 
     b = tf.get_variable(
@@ -77,10 +80,13 @@ def _group_conv(X, filters, groups, kernel=1, stride=1, padding='SAME', trainabl
     in_channels = X.shape.as_list()[-1]
     in_channels_per_group = int(in_channels/groups)
     filters_per_group = int(filters/groups)
+    # kaiming uniform initialization
+    maxval = math.sqrt(6.0/in_channels_per_group)
 
     K = tf.get_variable(
         'kernel', [kernel, kernel, in_channels_per_group, filters],
-        tf.float32, trainable=trainable
+        tf.float32, tf.random_uniform_initializer(-maxval, maxval),
+        trainable=trainable
     )
 
     X_channel_splits = tf.split(X, [in_channels_per_group]*groups, axis=-1)
@@ -101,10 +107,13 @@ def _group_conv(X, filters, groups, kernel=1, stride=1, padding='SAME', trainabl
 def _depthwise_conv(X, kernel=3, stride=1, padding='SAME', trainable=True):
 
     in_channels = X.shape.as_list()[-1]
+    # kaiming uniform initialization
+    maxval = math.sqrt(6.0/in_channels)
 
     W = tf.get_variable(
         'depthwise_kernel', [kernel, kernel, in_channels, 1],
-        tf.float32, trainable=trainable
+        tf.float32, tf.random_uniform_initializer(-maxval, maxval),
+        trainable=trainable
     )
 
     tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, W)
@@ -199,14 +208,19 @@ def _mapping(X, groups, num_classes, is_training):
     elif groups == 8:
         out_channels = 384
     # all 'out_channels' are divisible by corresponding 'groups'
+    
+    # to customize the network to a desired complexity
+    # we can simply apply a scale factor
+    out_channels = int(out_channels*0.5)
 
-    features_init = tf.contrib.layers.xavier_initializer_conv2d()
-    with tf.variable_scope('features', initializer=features_init):
+    with tf.variable_scope('features'):
 
         with tf.variable_scope('conv1'):
             result = _conv(X, 24, kernel=3, stride=1)
             # in the original paper they are using stride=2
             # but because I use small 64x64 images I chose stride=1
+            result = _batch_norm(result, is_training)
+            result = _nonlinearity(result)
         result = _max_pooling(result)
 
         with tf.variable_scope('stage2'):
@@ -236,9 +250,7 @@ def _mapping(X, groups, num_classes, is_training):
                 with tf.variable_scope('unit' + str(i)):
                     result = _shufflenet_unit(result, groups, is_training)
 
-    classifier_init = tf.random_normal_initializer(mean=0.0, stddev=0.01)
-    with tf.variable_scope('classifier', initializer=classifier_init):
-
+    with tf.variable_scope('classifier'):
         result = _global_average_pooling(result)
         result = _dropout(result, 0.5, is_training)
         logits = _affine(result, num_classes)
@@ -265,7 +277,8 @@ def _add_weight_decay(weight_decay):
 
 def _affine(X, size):
     input_dim = X.shape.as_list()[1]
-    maxval = math.sqrt(2.0/input_dim)
+    # kaiming uniform initialization
+    maxval = math.sqrt(6.0/input_dim)
 
     W = tf.get_variable(
         'kernel', [input_dim, size], tf.float32,
