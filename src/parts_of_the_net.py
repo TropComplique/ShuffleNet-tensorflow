@@ -20,7 +20,7 @@ def _channel_shuffle(X, groups):
 def _mapping(X, groups, num_classes, is_training):
 
     # number of shuffle units of stride 1 in each stage
-    n_shuffle_units = [2, 3, 2]
+    n_shuffle_units = [1, 3, 1]
     # in the original paper: [3, 7, 3]
 
     # second stage's number of output channels
@@ -37,8 +37,8 @@ def _mapping(X, groups, num_classes, is_training):
     # all 'out_channels' are divisible by corresponding 'groups'
 
     # to customize the network to a desired complexity
-    # we can apply a scale factor
-    out_channels = int(out_channels*0.25)
+    # you can apply a scale factor
+    out_channels = int(out_channels*0.75)
     # in the original paper they are considering
     # scale factor values: 0.25, 0.5, 1.0
 
@@ -105,9 +105,10 @@ def _dropout(X, rate, is_training):
 def _batch_norm(X, is_training):
     return tf.layers.batch_normalization(
         X, scale=False, center=True,
-        momentum=0.1,  # sometimes right momentum value is very important
+        momentum=0.1,  # it differs from the default value
         training=is_training, fused=True
     )
+    # sometimes right momentum value is very important
 
 
 def _global_average_pooling(X):
