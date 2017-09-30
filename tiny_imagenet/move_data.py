@@ -31,7 +31,7 @@ And in the same way arrange validation data.
 """
 
 
-# load validation metadata 
+# load validation metadata
 annotations_file = os.path.join(data_dir, 'val', 'val_annotations.txt')
 val_data = pd.read_csv(annotations_file, sep='\t', header=None)
 val_data.drop([2, 3, 4, 5], axis=1, inplace=True)  # drop bounding boxes info

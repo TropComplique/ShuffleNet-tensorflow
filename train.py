@@ -29,7 +29,7 @@ parser.add_argument(
     help='A string, path to tfrecords validation dataset file.'
 )
 parser.add_argument(
-    '--num_epochs', type=int, default=30,
+    '--num_epochs', type=int, default=35,
     help='An integer.'
 )
 parser.add_argument(
@@ -130,21 +130,12 @@ def train():
             ops['saver'].restore(sess, os.path.join(dir_to_save, 'model'))
         except:
             print('\nCan\'t restore the saved model, '
-                    'maybe architectures don\'t match.')
+                  'maybe architectures don\'t match.')
             sys.exit()
     else:
         print('Training model from scratch.\n')
         initial_epoch = 1
         sess.run(ops['init_variables'])
-
-    # things that will be returned
-    losses = []
-    is_early_stopped = False
-
-    training_epochs = range(
-        initial_epoch,
-        initial_epoch + FLAGS.num_epochs
-    )
 
     # initialize data sources
     data_dict = {
@@ -154,10 +145,16 @@ def train():
     }
     sess.run(ops['init_data'], data_dict)
 
+    losses = []
+    training_epochs = range(
+        initial_epoch,
+        initial_epoch + FLAGS.num_epochs
+    )
+
+    # begin training
     try:
-        # begin training
         for epoch in training_epochs:
-            
+
             start_time = time.time()
             running_loss, running_accuracy = 0.0, 0.0
             sess.run(ops['train_init'])
@@ -175,10 +172,10 @@ def train():
             ], options=run_options, run_metadata=run_metadata)
             running_loss += batch_loss
             running_accuracy += batch_accuracy
-            
+
             print('epoch', epoch)
             training_steps = tqdm(
-                range(1, FLAGS.steps_per_epoch), 
+                range(1, FLAGS.steps_per_epoch),
                 initial=1, total=FLAGS.steps_per_epoch
             )
 
@@ -198,12 +195,10 @@ def train():
             train_loss = running_loss/FLAGS.steps_per_epoch
             train_accuracy = running_accuracy/FLAGS.steps_per_epoch
 
-            time_taken = time.time() - start_time
-
             # collect all losses and accuracies
             losses += [(
                 epoch, train_loss, val_loss,
-                train_accuracy, val_accuracy, time_taken
+                train_accuracy, val_accuracy, time.time() - start_time
             )]
             writer.add_run_metadata(run_metadata, str(epoch))
             writer.add_summary(summary, epoch)
@@ -223,8 +218,10 @@ def train():
                 FLAGS.lr_patience, FLAGS.lr_threshold
             )
     except (KeyboardInterrupt, SystemExit):
+        # you can interrupt training by ctrl-c,
+        # your model will be saved
         print(' Interruption detected, exiting the program...')
-    
+
     print('Writing logs and saving the trained model.')
     _write_training_info(
         FLAGS, losses, warm,
@@ -271,7 +268,7 @@ def _is_early_stopping(losses, patience=10, threshold=0.01):
 
 
 def _reduce_lr_on_plateau(
-        sess, ops, losses, 
+        sess, ops, losses,
         patience=10, threshold=0.01
         ):
 
@@ -301,16 +298,17 @@ def _write_training_info(
         # if file is new then add columns
         if not warm:
             columns = ('epoch,train_loss,val_loss,'
-                'train_accuracy,val_accuracy,time\n')
+                       'train_accuracy,val_accuracy,time\n')
             f.write(columns)
 
         for i in losses:
             values = ('{0},{1:.3f},{2:.3f},'
-                '{3:.3f},{4:.3f},{5:.3f}\n').format(*i)
+                      '{3:.3f},{4:.3f},{5:.3f}\n').format(*i)
             f.write(values)
-    
+
     with open(model_config_file, mode) as f:
         FLAGS_dict = vars(FLAGS)
+        # len(losses) equals to the number of passed full epochs
         FLAGS_dict['num_epochs'] = len(losses)
         json.dump(FLAGS_dict, f)
         f.write('\n')

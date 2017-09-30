@@ -57,7 +57,7 @@ def main():
     np.save(os.path.join(args.save_dir, 'class_encoder.npy'), encoder)
     convert(args.train_dir, encoder, os.path.join(args.save_dir, 'train.tfrecords'))
     convert(args.val_dir, encoder, os.path.join(args.save_dir, 'val.tfrecords'))
-    
+
     print('\nCreated two tfrecords files:')
     print(os.path.join(args.save_dir, 'train.tfrecords'))
     print(os.path.join(args.save_dir, 'val.tfrecords'))
@@ -71,12 +71,13 @@ def _int64_feature(value):
     return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
 
+# here you can also just use `return array.tostring()`
+# but it will make tfrecords file large
 def to_bytes(array):
     image = Image.fromarray(array)
     tmp = io.BytesIO()
     image.save(tmp, format='jpeg')
     return tmp.getvalue()
-    # return array.tostring()
 
 
 def convert(folder, encoder, tfrecords_filename):
@@ -107,9 +108,6 @@ def convert(folder, encoder, tfrecords_filename):
 
         # get class of the image
         target = int(row.class_number)
-
-        # get spatial size
-        width, height = image.size
 
         feature = {
             'image': _bytes_feature(to_bytes(array)),

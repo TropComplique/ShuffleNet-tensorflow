@@ -19,9 +19,9 @@ def predict_proba(graph, ops, X, run):
     """
     sess = tf.Session(graph=graph)
     ops['saver'].restore(sess, os.path.join('saved', 'run' + str(run) + '/model'))
-    
+
     feed_dict = {'inputs/X:0': X, 'control/is_training:0': False}
     predictions = sess.run(ops['predictions'], feed_dict)
-    
+
     sess.close()
     return predictions
