@@ -1,6 +1,13 @@
 import tensorflow as tf
 
 
+# you need to tweak these numbers for your system,
+# it can accelerate training
+SHUFFLE_BUFFER_SIZE = 10000
+NUM_THREADS = 4
+OUTPUT_BUFFER_SIZE = 1000
+
+
 def _get_data(num_classes, image_size):
 
     batch_size = tf.Variable(
@@ -18,18 +25,16 @@ def _get_data(num_classes, image_size):
     init_data = tf.variables_initializer([batch_size, train_file, val_file])
 
     train_dataset = tf.contrib.data.TFRecordDataset(train_file)
-    val_dataset = tf.contrib.data.TFRecordDataset(val_file)
-
     train_dataset = train_dataset.map(
         lambda x: _parse_and_preprocess(x, image_size, augmentation=True),
-        num_threads=4,
-        output_buffer_size=1000
+        num_threads=NUM_THREADS,
+        output_buffer_size=OUTPUT_BUFFER_SIZE
     )
-
-    train_dataset = train_dataset.shuffle(buffer_size=10000)
+    train_dataset = train_dataset.shuffle(buffer_size=SHUFFLE_BUFFER_SIZE)
     train_dataset = train_dataset.batch(batch_size)
     train_dataset = train_dataset.repeat()
 
+    val_dataset = tf.contrib.data.TFRecordDataset(val_file)
     val_dataset = val_dataset.map(
         lambda x: _parse_and_preprocess(x, image_size)
     )
@@ -40,7 +45,6 @@ def _get_data(num_classes, image_size):
         train_dataset.output_types,
         train_dataset.output_shapes
     )
-
     train_init = iterator.make_initializer(train_dataset)
     val_init = iterator.make_initializer(val_dataset)
 

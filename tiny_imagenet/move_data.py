@@ -7,7 +7,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    'data_dir', type=str,
+    '--data_dir', type=str,
     default='/home/ubuntu/data/tiny-imagenet-200/',
     help='A path to the tiny-imagenet-200 folder.'
 )

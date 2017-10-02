@@ -3,10 +3,6 @@ from .input_pipeline import _get_data
 from .architecture import _mapping
 
 
-MOMENTUM = 0.9
-USE_NESTEROV = True
-LR_REDUCE_FACTOR = 0.1
-
 # tiny-imagenet dataset has 200 categories
 # and all images have 64x64 size,
 # but i use 56x56 images because i do
@@ -15,18 +11,23 @@ IMAGE_SIZE = 56
 NUM_CLASSES = 200
 
 
+# optimizer settings
+MOMENTUM = 0.9
+USE_NESTEROV = True
+LR_REDUCE_FACTOR = 0.1
+
+
 def get_shufflenet(
         initial_lr=1e-2, weight_decay=1e-4,
-        groups=3, dropout=0.5, complexity_scale_factor=0.75
-        ):
+        groups=3, dropout=0.5, complexity_scale_factor=0.75):
     """Create a ShuffleNet computational graph.
 
     Arguments:
-        initial_lr: A floar number.
-        weight_decay: A floar number.
+        initial_lr: A floar number, initial learning rate.
+        weight_decay: A floar number, L2 regularization.
         groups: An integer, number of groups in group convolutions,
             only possible values are: 1, 2, 3, 4, 8.
-        dropout: A floar number, dropout rate before last linear layer.
+        dropout: A floar number, dropout rate before the last linear layer.
         complexity_scale_factor: A floar number, to customize the network
             to a desired complexity you can apply a scale factor,
             in the original paper they are considering
@@ -42,6 +43,7 @@ def get_shufflenet(
     with graph.as_default():
 
         with tf.variable_scope('control'):
+            # it controls dropout and batch_norm layers
             is_training = tf.placeholder_with_default(True, [], 'is_training')
 
         with tf.device('/cpu:0'), tf.variable_scope('input_pipeline'):
@@ -86,6 +88,7 @@ def get_shufflenet(
                 initial_lr, trainable=False,
                 dtype=tf.float32, name='lr'
             )
+            # you can reduce learning rate by some factor, usually 0.1
             drop_learning_rate = tf.assign(
                 learning_rate, LR_REDUCE_FACTOR*learning_rate
             )
@@ -98,6 +101,7 @@ def get_shufflenet(
             grads_and_vars = optimizer.compute_gradients(total_loss)
             optimize = optimizer.apply_gradients(grads_and_vars)
 
+        # add histograms of all gradients
         grad_summaries = tf.summary.merge(
             [tf.summary.histogram(v.name[:-2] + '_grad_hist', g)
              for g, v in grads_and_vars]
@@ -132,7 +136,7 @@ def get_shufflenet(
 
 
 def _add_summaries():
-    # add histograms of all trainable variables
+    """Add histograms of all trainable variables."""
 
     summaries = []
     trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
@@ -144,7 +148,7 @@ def _add_summaries():
 
 
 def _add_weight_decay(weight_decay):
-    # add L2 regularization to all trainable kernel weights
+    """Add L2 regularization to all trainable kernel weights."""
 
     weight_decay = tf.constant(
         weight_decay, tf.float32,

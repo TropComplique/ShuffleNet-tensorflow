@@ -72,7 +72,8 @@ def _int64_feature(value):
 
 
 # here you can also just use `return array.tostring()`
-# but it will make tfrecords file large
+# but it will make tfrecords files a lot larger and
+# you will need to change the input pipeline
 def to_bytes(array):
     image = Image.fromarray(array)
     tmp = io.BytesIO()

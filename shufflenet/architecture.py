@@ -3,7 +3,7 @@ import math
 
 
 BATCH_NORM_MOMENTUM = 0.1
-# it differs from the default value,
+# it differs from the default Tensorflow value (0.9),
 # sometimes right momentum value is very important
 
 
@@ -40,10 +40,9 @@ def _channel_shuffle(X, groups):
 def _mapping(
         X, is_training, num_classes=200,
         groups=3, dropout=0.5,
-        complexity_scale_factor=0.75
-        ):
+        complexity_scale_factor=0.75):
 
-    # second stage's number of output channels
+    # 'out_channels' equals to second stage's number of output channels
     if groups == 1:
         out_channels = 144
     elif groups == 2:
@@ -56,7 +55,7 @@ def _mapping(
         out_channels = 384
     # all 'out_channels' are divisible by corresponding 'groups'
 
-    # possibly decrease network's width
+    # if you want you can decrease network's width
     out_channels = int(out_channels * complexity_scale_factor)
 
     with tf.variable_scope('features'):
@@ -66,7 +65,7 @@ def _mapping(
             with tf.variable_scope('conv1'):
                 result = _conv(X, 24, kernel=3, stride=1)
                 # in the original paper they are using stride=2
-                # but because I use small 64x64 images I chose stride=1
+                # but because i use small 64x64 images i chose stride=1
 
             result = _batch_norm(result, is_training)
             result = _nonlinearity(result)
