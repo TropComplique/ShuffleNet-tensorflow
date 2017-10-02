@@ -3,7 +3,7 @@
 This is an implementation of
 [ShuffleNet: An Extremely Efficient Convolutional Neural Network for Mobile Devices](https://arxiv.org/abs/1707.01083).
 It is written in Tensorflow and tested on [Tiny ImageNet](https://tiny-imagenet.herokuapp.com/) dataset.
-The dataset consists of 64x64 images and has 200 classes. The network gives accuracy ~..% after .. epochs (~.. hours on p2.xlarge) (See `logs` for configs)
+The dataset consists of 64x64 images and has 200 classes. The network gives validation accuracy ~49% after 40 epochs (this is ~2.2 hours on p2.xlarge).
 
 ## Implementation details
 * I use slightly reduced in size ShuffleNet: in the original paper it has more layers. But it is easy to change the code in `shufflenet/architecture.py` to make it like the original.
