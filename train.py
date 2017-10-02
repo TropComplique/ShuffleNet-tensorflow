@@ -66,7 +66,7 @@ parser.add_argument(
     help='A floar number, initial learning rate.'
 )
 parser.add_argument(
-    '--weight_decay', type=float, default=4e-3,
+    '--weight_decay', type=float, default=5e-3,
     help='A floar number.'
 )
 parser.add_argument(

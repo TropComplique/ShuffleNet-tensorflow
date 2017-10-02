@@ -13,14 +13,15 @@ The dataset consists of 64x64 images and has 200 classes. The network gives accu
 
 ## How to use it
 Assuming that Tiny ImageNet data is in `/home/ubuntu/data/tiny-imagenet-200/` steps are
-* `cd ShuffleNet-tensorflow`
+* `cd ShuffleNet-tensorflow`.
 * `python tiny_imagenet/move_data.py`  
-to move the data a little bit.
+to slightly change folder structure of the data.
 * `python image_dataset_to_tfrecords.py`  
 to convert the dataset to `tfrecords` format.
-* (optional) If you want, edit numbers of various layers in `shufflenet/architecture.py`.
+* (optional) If you want, edit the number of ShuffleNet Units in `shufflenet/architecture.py`.
 * `python train.py`  
 to begin training. Evaluation is after each epoch.
+* logs and the saved model will be in `logs/run0` and `saved/run0`.
 
 ## Requirements
 * Python 3.6
