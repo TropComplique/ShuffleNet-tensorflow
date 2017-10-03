@@ -9,7 +9,8 @@ BATCH_NORM_MOMENTUM = 0.1
 
 N_SHUFFLE_UNITS = [1, 3, 1]
 # number of shuffle units of stride 1 in each stage,
-# in the original paper: [3, 7, 3]
+# in the original paper: [3, 7, 3].
+# Also I changed stride in the first convolution layer.
 
 # number of layers that the network will have:
 # (sum(N_SHUFFLE_UNITS) + 3)*3 + 1 + 1
