@@ -121,8 +121,8 @@ def train():
     writer = tf.summary.FileWriter(dir_to_log, sess.graph)
     print('\nCreated the graph and started a session!')
 
-    # check if to continue training
-    warm = os.path.exists(training_info_file)
+    # check if to continue training or start from scratch
+    warm = os.path.exists(training_info_file)  # warm start
     if warm and not FLAGS.reset:
         print('Restoring previously saved model and continuing training.\n')
         initial_epoch = sum(1 for line in open(training_info_file))
@@ -145,13 +145,15 @@ def train():
     }
     sess.run(ops['init_data'], data_dict)
 
-    losses = []
+    losses = []  # training info will be collected here
     training_epochs = range(
         initial_epoch,
         initial_epoch + FLAGS.num_epochs
     )
 
-    # begin training
+    # begin training,
+    # but you can interrupt training by ctrl-c,
+    # your model will be saved
     try:
         for epoch in training_epochs:
 
@@ -203,7 +205,6 @@ def train():
             writer.add_run_metadata(run_metadata, str(epoch))
             writer.add_summary(summary, epoch)
             writer.add_summary(grad_summary, epoch)
-
             print('loss: {0:.3f}, val_loss: {1:.3f}, '
                   'acc: {2:.3f}, val_acc: {3:.3f}, time: {4:.3f}\n'.format(*losses[-1][1:]))
 
@@ -218,8 +219,6 @@ def train():
                 FLAGS.lr_patience, FLAGS.lr_threshold
             )
     except (KeyboardInterrupt, SystemExit):
-        # you can interrupt training by ctrl-c,
-        # your model will be saved
         print(' Interruption detected, exiting the program...')
 
     print('Writing logs and saving the trained model.')
@@ -269,8 +268,7 @@ def _is_early_stopping(losses, patience=10, threshold=0.01):
 
 def _reduce_lr_on_plateau(
         sess, ops, losses,
-        patience=10, threshold=0.01
-        ):
+        patience=10, threshold=0.01):
 
     # get validation set accuracies
     accuracies = [x[4] for x in losses]
@@ -289,8 +287,7 @@ def _reduce_lr_on_plateau(
 
 def _write_training_info(
         FLAGS, losses, warm,
-        training_info_file, model_config_file
-        ):
+        training_info_file, model_config_file):
 
     mode = 'a' if warm else 'w'
     with open(training_info_file, mode) as f:
