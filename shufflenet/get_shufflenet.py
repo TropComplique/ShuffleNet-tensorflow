@@ -1,20 +1,8 @@
 import tensorflow as tf
 from .input_pipeline import _get_data
 from .architecture import _mapping
-
-
-# tiny-imagenet dataset has 200 categories
-# and all images have 64x64 size,
-# but i use 56x56 images because i do
-# data augmentation by making random crops
-IMAGE_SIZE = 56
-NUM_CLASSES = 200
-
-
-# optimizer settings
-MOMENTUM = 0.9
-USE_NESTEROV = True
-LR_REDUCE_FACTOR = 0.1
+from .CONSTANTS import IMAGE_SIZE, NUM_CLASSES,\
+    MOMENTUM, USE_NESTEROV, LR_REDUCE_FACTOR
 
 
 def get_shufflenet(
