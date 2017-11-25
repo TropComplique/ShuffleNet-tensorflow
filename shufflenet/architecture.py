@@ -1,22 +1,6 @@
 import tensorflow as tf
 import math
-
-
-BATCH_NORM_MOMENTUM = 0.1
-# it differs from the default Tensorflow value (0.9),
-# sometimes right momentum value is very important
-
-
-N_SHUFFLE_UNITS = [1, 3, 1]
-# number of shuffle units of stride 1 in each stage,
-# in the original paper: [3, 7, 3].
-# Also I changed stride in the first convolution layer.
-
-# number of layers that the network will have:
-# (sum(N_SHUFFLE_UNITS) + 3)*3 + 1 + 1
-
-# if input image has spatial size [56, 56]
-# then spatial size before global average pooling is [4, 4]
+from .CONSTANTS import BATCH_NORM_MOMENTUM, N_SHUFFLE_UNITS, FIRST_STRIDE
 
 
 def _channel_shuffle(X, groups):
@@ -37,11 +21,28 @@ def _channel_shuffle(X, groups):
     return X
 
 
-# a ShuffleNet implementation
 def _mapping(
         X, is_training, num_classes=200,
         groups=3, dropout=0.5,
         complexity_scale_factor=0.75):
+    """A ShuffleNet implementation.
+
+    Arguments:
+        X: A float tensor with shape [batch_size, image_height, image_width, 3].
+        is_training: A boolean, whether the network is in the training mode.
+        num_classes: An integer.
+        groups: An integer, number of groups in group convolutions,
+            only possible values are: 1, 2, 3, 4, 8.
+        dropout: A floar number, dropout rate before the last linear layer.
+        complexity_scale_factor: A floar number, to customize the network
+            to a desired complexity you can apply a scale factor,
+            in the original paper they are considering
+            scale factor values: 0.25, 0.5, 1.0.
+            It determines the width of the network.
+
+    Returns:
+        A float tensor with shape [batch_size, num_classes].
+    """
 
     # 'out_channels' equals to second stage's number of output channels
     if groups == 1:
@@ -64,9 +65,7 @@ def _mapping(
         with tf.variable_scope('stage1'):
 
             with tf.variable_scope('conv1'):
-                result = _conv(X, 24, kernel=3, stride=1)
-                # in the original paper they are using stride=2
-                # but because i use small 64x64 images i chose stride=1
+                result = _conv(X, 24, kernel=3, stride=FIRST_STRIDE)
 
             result = _batch_norm(result, is_training)
             result = _nonlinearity(result)

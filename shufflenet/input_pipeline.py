@@ -1,14 +1,30 @@
 import tensorflow as tf
-
-
-# you need to tweak these numbers for your system,
-# it can accelerate training
-SHUFFLE_BUFFER_SIZE = 10000
-NUM_THREADS = 4
-OUTPUT_BUFFER_SIZE = 1000
+from .CONSTANTS import SHUFFLE_BUFFER_SIZE,\
+    NUM_THREADS, PREFETCH_BUFFER_SIZE
 
 
 def _get_data(num_classes, image_size):
+    """Get images and targets in batches.
+
+    Training data is augmented with random crops,
+    flips, and color manipulations.
+    When evaluating center crop is made.
+
+    Arguments:
+        num_classes: An integer.
+        image_size: An integer, it is assumed that
+            image_width = image_height = image_size.
+
+    Returns:
+        A dict with the following keys:
+            'init_data': An op, initialize data sources and batch size.
+            'train_init': An op, initialize train data iterator.
+            'val_init': An op, initialize validation data iterator.
+            'x_batch': A float tensor with shape [batch_size, image_size, image_size, 3],
+                images have pixel values in range [0, 1].
+            'y_batch': A float tensor with shape [batch_size, num_classes],
+                targets are one-hot encoded.
+    """
 
     batch_size = tf.Variable(
         tf.placeholder(tf.int64, [], 'batch_size'),
@@ -24,24 +40,24 @@ def _get_data(num_classes, image_size):
     )
     init_data = tf.variables_initializer([batch_size, train_file, val_file])
 
-    train_dataset = tf.contrib.data.TFRecordDataset(train_file)
+    train_dataset = tf.data.TFRecordDataset(train_file)
     train_dataset = train_dataset.map(
         lambda x: _parse_and_preprocess(x, image_size, augmentation=True),
-        num_threads=NUM_THREADS,
-        output_buffer_size=OUTPUT_BUFFER_SIZE
-    )
+        num_parallel_calls=NUM_THREADS
+    ).prefetch(PREFETCH_BUFFER_SIZE)
+
     train_dataset = train_dataset.shuffle(buffer_size=SHUFFLE_BUFFER_SIZE)
     train_dataset = train_dataset.batch(batch_size)
     train_dataset = train_dataset.repeat()
 
-    val_dataset = tf.contrib.data.TFRecordDataset(val_file)
+    val_dataset = tf.data.TFRecordDataset(val_file)
     val_dataset = val_dataset.map(
         lambda x: _parse_and_preprocess(x, image_size)
     )
     val_dataset = val_dataset.batch(batch_size)
     val_dataset = val_dataset.repeat()
 
-    iterator = tf.contrib.data.Iterator.from_structure(
+    iterator = tf.data.Iterator.from_structure(
         train_dataset.output_types,
         train_dataset.output_shapes
     )
