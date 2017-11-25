@@ -20,12 +20,12 @@ to slightly change the folder structure of the data.
 * `python image_dataset_to_tfrecords.py`  
 to convert the dataset to `tfrecords` format.
 * (optional) If you want to change the network's length,  
-edit the number of ShuffleNet Units in `shufflenet/architecture.py`.
+edit the number of ShuffleNet Units in `shufflenet/CONSTANTS.py`.
 * `python train.py`  
 to begin training. Evaluation is after each epoch.
 * logs and the saved model will be in `logs/run0` and `saved/run0`.
 
-To train on your dataset, you need to change a couple of parameters in the code.
+To train on your dataset, you need to change a couple of parameters in `shufflenet/CONSTANTS.py` file.
 
 ## Requirements
 * Python 3.6
