@@ -9,7 +9,8 @@ def predict_proba(graph, ops, X, run):
         graph: A Tensorflow graph.
         ops: A dict of ops of the graph.
         X: A numpy array of shape [n_samples, image_size, image_size, 3]
-            and of type 'float32'.
+            and of type 'float32', a batch of images with
+            pixel values in range [0, 1].
         run: An integer that determines a folder where a fitted model
             is saved.
 
