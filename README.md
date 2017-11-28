@@ -7,7 +7,7 @@ The dataset consists of 64x64 images and has 200 classes. The network gives vali
 
 ## Implementation details
 * I use reduced in size ShuffleNet: in the original paper it has more layers.  
-But it is easy to change the code in `shufflenet/architecture.py` to make it like the original.
+But it is easy to change a couple of parameters in `shufflenet/CONSTANTS.py` to make it like the original.
 * For the input pipeline I use `tf.data.TFRecordDataset`.
 * For data augmentation I use 56x56 sized random crops and random color manipulations.
 * I use a reduce-on-plateau learning rate scheduler.
@@ -25,7 +25,7 @@ edit the number of ShuffleNet Units in `shufflenet/CONSTANTS.py`.
 to begin training. Evaluation is after each epoch.
 * logs and the saved model will be in `logs/run0` and `saved/run0`.
 
-To train on your dataset, you need to change a couple of parameters in `shufflenet/CONSTANTS.py` file.
+To train on your dataset, you need to change a few values in `shufflenet/CONSTANTS.py` file.
 
 ## Requirements
 * Python 3.6
